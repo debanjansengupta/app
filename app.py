@@ -225,38 +225,60 @@ with tab2:
             st.markdown("---")
             st.subheader("🎯 Automated Contextual Visualization Layout")
             
-            # Generate custom visualizations mapped directly to user-uploaded questions
+            # ==========================================
+            # SMART TARGET VISUALIZATION ENGINE (FIXED)
+            # ==========================================
             if questions_list:
+                num_cols = df.select_dtypes(include=['number']).columns.tolist()
+                cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+                all_cols = df.columns.tolist()
+
                 for idx, question in enumerate(questions_list):
                     st.write(f"#### Insight Render Area {idx+1}: *{question}*")
-                    
-                    fig, ax = plt.subplots(figsize=(10, 4.5))
                     q_low = question.lower()
                     
-                    # Logic branch assessing metric intent inside strings
-                    if "distribution" in q_low or "spread" in q_low:
-                        num_cols = df.select_dtypes(include=['number']).columns.tolist()
-                        if num_cols:
-                            sns.histplot(data=df, x=num_cols[0], kde=True, ax=ax, color="#118D95")
-                            ax.set_title(f"Distribution Analysis Matrix for {num_cols[0]}", fontsize=12, fontweight='bold')
-                    elif "trend" in q_low or "time" in q_low:
-                        num_cols = df.select_dtypes(include=['number']).columns.tolist()
-                        if num_cols:
-                            ax.plot(df.index[:200], df[num_cols[0]].iloc[:200], color="#3B8EA5", linewidth=2)
-                            ax.set_title("Operational Workspace Core Run Trend Analysis", fontsize=12, fontweight='bold')
-                    else:
-                        # Fallback default: Clustered categorical variable tracking
-                        cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-                        num_cols = df.select_dtypes(include=['number']).columns.tolist()
-                        if cat_cols and num_cols:
-                            top_10 = df.groupby(cat_cols[0])[num_cols[0]].sum().nlargest(10).reset_index()
-                            sns.barplot(data=top_10, x=cat_cols[0], y=num_cols[0], ax=ax, color="#118D95")
-                            plt.xticks(rotation=35, ha='right')
-                            ax.set_title(f"Top 10 Value Categories for {cat_cols[0]}", fontsize=12, fontweight='bold')
-                        else:
-                            ax.text(0.5, 0.5, "Insufficient variable types for complex plotting structures.", ha='center', va='center')
+                    active_num_col = num_cols[0] if num_cols else None
+                    active_cat_col = cat_cols[0] if cat_cols else None
                     
-                    # Apply cleanly styled borders matching desktop app designs
+                    for col in all_cols:
+                        if col.lower() in q_low:
+                            if col in num_cols:
+                                active_num_col = col
+                            elif col in cat_cols:
+                                active_cat_col = col
+
+                    if active_num_col == (num_cols[0] if num_cols else None) and len(num_cols) > 1:
+                        active_num_col = num_cols[idx % len(num_cols)]
+                    if active_cat_col == (cat_cols[0] if cat_cols else None) and len(cat_cols) > 1:
+                        active_cat_col = cat_cols[idx % len(cat_cols)]
+
+                    fig, ax = plt.subplots(figsize=(10, 4.5))
+                    
+                    if "distribution" in q_low or "spread" in q_low or "histogram" in q_low:
+                        if active_num_col:
+                            sns.histplot(data=df, x=active_num_col, kde=True, ax=ax, color="#118D95")
+                            ax.set_title(f"Distribution Profile: {active_num_col}", fontsize=12, fontweight='bold')
+                        else:
+                            ax.text(0.5, 0.5, "Requires numeric values.", ha='center', va='center')
+                            
+                    elif "trend" in q_low or "time" in q_low or "growth" in q_low or "over year" in q_low:
+                        if active_num_col:
+                            sample_size = min(len(df), 500)
+                            ax.plot(df.index[:sample_size], df[active_num_col].iloc[:sample_size], color="#E36C22", linewidth=2)
+                            ax.set_title(f"Timeline Performance Metrics: {active_num_col}", fontsize=12, fontweight='bold')
+                        else:
+                            ax.text(0.5, 0.5, "Requires scale values.", ha='center', va='center')
+                            
+                    else:
+                        if active_cat_col and active_num_col:
+                            top_10 = df.groupby(active_cat_col)[active_num_col].sum().nlargest(10).reset_index()
+                            chart_color = PBI_COLORS[idx % len(PBI_COLORS)]
+                            sns.barplot(data=top_10, x=active_cat_col, y=active_num_col, ax=ax, color=chart_color)
+                            plt.xticks(rotation=35, ha='right')
+                            ax.set_title(f"Top 10 Metrics: {active_num_col} broken down by {active_cat_col}", fontsize=12, fontweight='bold')
+                        else:
+                            ax.text(0.5, 0.5, "Variables structure mismatch.", ha='center', va='center')
+                    
                     ax.set_facecolor('#F8F9FA')
                     fig.patch.set_facecolor('#FFFFFF')
                     ax.spines['top'].set_visible(False)
